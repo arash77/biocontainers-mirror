@@ -1,0 +1,132 @@
+name: Mirror BioContainers to GHCR
+
+on:
+  schedule:
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      max_repos:
+        description: 'Max repos to sync (0 = unlimited)'
+        required: false
+        default: '50'
+      resume:
+        description: 'Skip already-synced repos'
+        required: false
+        default: true
+        type: boolean
+      dry_run:
+        description: 'Discover only, no copy'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  discover:
+    name: Discover repos
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      repo_count: ${{ steps.list.outputs.repo_count }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download previous sync state
+        if: ${{ inputs.resume != 'false' }}
+        uses: dawidd6/action-download-artifact@v3
+        with:
+          name: sync-state
+          if_no_artifact_found: ignore
+        continue-on-error: true
+
+      - name: List repos
+        id: list
+        env:
+          MAX_REPOS: ${{ inputs.max_repos || '50' }}
+          DRY_RUN: ${{ inputs.dry_run || 'false' }}
+        run: bash scripts/list-repos.sh
+
+      - name: Upload work manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: work-manifest
+          path: work-manifest.json
+          retention-days: 1
+
+  sync:
+    name: Sync images
+    needs: discover
+    if: ${{ needs.discover.outputs.repo_count > 0 && inputs.dry_run != 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install skopeo
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y skopeo
+
+      - name: Download work manifest
+        uses: actions/download-artifact@v4
+        with:
+          name: work-manifest
+
+      - name: Download previous sync state
+        uses: dawidd6/action-download-artifact@v3
+        with:
+          name: sync-state
+          if_no_artifact_found: ignore
+        continue-on-error: true
+
+      - name: Login to GHCR
+        run: echo "${{ secrets.GHCR_PAT }}" | skopeo login ghcr.io --username ${{ github.repository_owner }} --password-stdin
+
+      - name: Sync repos
+        env:
+          GHCR_OWNER: ${{ github.repository_owner }}
+          TIMEOUT_MINUTES: '330'
+        run: bash scripts/sync-repos.sh
+
+      - name: Upload sync state
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sync-state
+          path: |
+            synced-repos.json
+            failed-repos.json
+            run-metadata.json
+          retention-days: 90
+          overwrite: true
+
+  report:
+    name: Generate report
+    needs: [discover, sync]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download sync state
+        uses: dawidd6/action-download-artifact@v3
+        with:
+          name: sync-state
+          if_no_artifact_found: ignore
+        continue-on-error: true
+
+      - name: Download work manifest
+        uses: dawidd6/action-download-artifact@v3
+        with:
+          name: work-manifest
+          if_no_artifact_found: ignore
+        continue-on-error: true
+
+      - name: Generate report
+        env:
+          DRY_RUN: ${{ inputs.dry_run || 'false' }}
+          REPO_COUNT: ${{ needs.discover.outputs.repo_count }}
+        run: bash scripts/generate-report.sh >> $GITHUB_STEP_SUMMARY
