@@ -10,6 +10,7 @@ SYNCED_FILE="${SYNCED_FILE:-synced-repos.json}"
 FAILED_FILE="${FAILED_FILE:-failed-repos.json}"
 METADATA_FILE="${METADATA_FILE:-run-metadata.json}"
 GHCR_OWNER="${GHCR_OWNER:-}"
+GHCR_REPO="${GHCR_REPO:-}"
 TIMEOUT_MINUTES="${TIMEOUT_MINUTES:-330}"
 
 # How many minutes before timeout to stop processing new repos
@@ -23,6 +24,10 @@ echo "    Will stop at $(date -u -d "@${DEADLINE}" +%Y-%m-%dT%H:%M:%SZ) (${MARGI
 
 if [[ -z "$GHCR_OWNER" ]]; then
   echo "ERROR: GHCR_OWNER must be set" >&2
+  exit 1
+fi
+if [[ -z "$GHCR_REPO" ]]; then
+  echo "ERROR: GHCR_REPO must be set" >&2
   exit 1
 fi
 
@@ -92,7 +97,7 @@ while IFS= read -r repo; do
   fi
 
   src="quay.io/biocontainers/${repo}"
-  dst="ghcr.io/${GHCR_OWNER}/${repo}"
+  dst="ghcr.io/${GHCR_OWNER}/${GHCR_REPO}/${repo}"
 
   echo "--> Syncing ${repo}"
 
