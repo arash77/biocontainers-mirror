@@ -29,11 +29,11 @@ jobs:
       repo_count: ${{ steps.list.outputs.repo_count }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Download previous sync state
         if: ${{ inputs.resume != 'false' }}
-        uses: dawidd6/action-download-artifact@v3
+        uses: dawidd6/action-download-artifact@v19
         with:
           name: sync-state
           if_no_artifact_found: ignore
@@ -47,7 +47,7 @@ jobs:
         run: bash scripts/list-repos.sh
 
       - name: Upload work manifest
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: work-manifest
           path: work-manifest.json
@@ -63,7 +63,7 @@ jobs:
       packages: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install skopeo
         run: |
@@ -71,12 +71,12 @@ jobs:
           sudo apt-get install -y skopeo
 
       - name: Download work manifest
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: work-manifest
 
       - name: Download previous sync state
-        uses: dawidd6/action-download-artifact@v3
+        uses: dawidd6/action-download-artifact@v19
         with:
           name: sync-state
           if_no_artifact_found: ignore
@@ -94,7 +94,7 @@ jobs:
 
       - name: Upload sync state
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: sync-state
           path: |
@@ -112,17 +112,17 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Download sync state
-        uses: dawidd6/action-download-artifact@v3
+        uses: dawidd6/action-download-artifact@v19
         with:
           name: sync-state
           if_no_artifact_found: ignore
         continue-on-error: true
 
       - name: Download work manifest
-        uses: dawidd6/action-download-artifact@v3
+        uses: dawidd6/action-download-artifact@v19
         with:
           name: work-manifest
           if_no_artifact_found: ignore
